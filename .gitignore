@@ -1,0 +1,5 @@
+/venv
+*.parquet
+.vscode
+*.csv
+baseline_template.ipynb
