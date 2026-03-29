@@ -72,7 +72,54 @@ test_df["timestamp"] = pd.to_datetime(test_df["timestamp"])
 train_df = train_df.sort_values(["route_id", "timestamp"]).reset_index(drop=True)
 test_df = test_df.sort_values(["route_id", "timestamp"]).reset_index(drop=True)
 
+
+def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+
+    df["hour"] = df["timestamp"].dt.hour
+    df["minute"] = df["timestamp"].dt.minute
+    df["dayofweek"] = df["timestamp"].dt.dayofweek
+    df["is_weekend"] = (df["dayofweek"] >= 5).astype(int)
+
+    # циклическое кодирование времени суток
+    minutes_of_day = df["hour"] * 60 + df["minute"]
+    df["tod_sin"] = np.sin(2 * np.pi * minutes_of_day / 1440)
+    df["tod_cos"] = np.cos(2 * np.pi * minutes_of_day / 1440)
+
+    # циклическое кодирование дня недели
+    df["dow_sin"] = np.sin(2 * np.pi * df["dayofweek"] / 7)
+    df["dow_cos"] = np.cos(2 * np.pi * df["dayofweek"] / 7)
+
+    return df
+
+train_df = add_calendar_features(train_df)
+test_df = add_calendar_features(test_df)
+
 route_group = train_df.groupby("route_id", sort=False)
+
+# лаги по таргету
+for lag in [1, 2, 4, 8, 48]:
+    train_df[f"{TARGET_COL}_lag_{lag}"] = route_group[TARGET_COL].shift(lag)
+
+# rolling-статистики только по прошлому
+for window in [2, 4, 8, 48]:
+    train_df[f"{TARGET_COL}_roll_mean_{window}"] = route_group[TARGET_COL].transform(
+        lambda s: s.shift(1).rolling(window, min_periods=1).mean()
+    )
+    train_df[f"{TARGET_COL}_roll_std_{window}"] = route_group[TARGET_COL].transform(
+        lambda s: s.shift(1).rolling(window, min_periods=2).std()
+    )
+
+# лаги по status_*
+status_cols = [c for c in train_df.columns if c.startswith("status_")]
+
+train_df["status_sum"] = train_df[status_cols].sum(axis=1)
+for lag in [1, 2, 4]:
+    train_df[f"status_sum_lag_{lag}"] = train_df.groupby("route_id")["status_sum"].shift(lag)
+
+for col in status_cols:
+    for lag in [1, 2]:
+        train_df[f"{col}_lag_{lag}"] = route_group[col].shift(lag)
 
 for step in range(1, FORECAST_POINTS + 1):
     train_df[f"target_step_{step}"] = route_group[TARGET_COL].shift(-step)
