@@ -1,5 +1,7 @@
 /venv
-*.parquet
-.vscode
+.vscode/
+__pycache__/
+raw/**/*.parquet
+baseline_ridge
 *.csv
-baseline_template.ipynb
+notebooks/*.ipynb_checkpoints/

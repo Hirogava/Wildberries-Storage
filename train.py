@@ -29,50 +29,6 @@ class WapePlusRbias:
         rbias = np.abs(y_pred.sum() / y_true.sum() - 1)
         return wape + rbias
 
-
-metric = WapePlusRbias()
-
-sns.set_theme(style="whitegrid", context="notebook")
-plt.rcParams["figure.figsize"] = (12, 5)
-
-# Модифицируйте в соответствии со своей задачей
-TRACK = "team"  
-TRAIN_DAYS = 14
-MAX_TRAIN_ROWS = 1_500_000
-RIDGE_ALPHA = 4.0
-RANDOM_STATE = 42
-
-# Меняйте конфигурацию при необходимости
-TRACK_CONFIG = {
-    "solo": {
-        "train_path": "train_solo_track.parquet",
-        "test_path": "test_solo_track.parquet",
-        "target_col": "target_1h",
-        "forecast_points": 8,
-    },
-    "team": {
-        "train_path": "E:/projects/wb_hack/Wildberries-Storage/train_team_track.parquet",
-        "test_path": "E:/projects/wb_hack/Wildberries-Storage/test_team_track.parquet",
-        "target_col": "target_2h",
-        "forecast_points": 10,
-    },
-}
-
-CONFIG = TRACK_CONFIG[TRACK]
-TARGET_COL = CONFIG["target_col"]
-FORECAST_POINTS = CONFIG["forecast_points"]
-FUTURE_TARGET_COLS = [f"target_step_{step}" for step in range(1, FORECAST_POINTS + 1)]
-
-train_df = pd.read_parquet(CONFIG["train_path"])
-test_df = pd.read_parquet(CONFIG["test_path"])
-
-train_df["timestamp"] = pd.to_datetime(train_df["timestamp"])
-test_df["timestamp"] = pd.to_datetime(test_df["timestamp"])
-
-train_df = train_df.sort_values(["route_id", "timestamp"]).reset_index(drop=True)
-test_df = test_df.sort_values(["route_id", "timestamp"]).reset_index(drop=True)
-
-
 def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
@@ -91,6 +47,49 @@ def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
     df["dow_cos"] = np.cos(2 * np.pi * df["dayofweek"] / 7)
 
     return df
+
+
+metric = WapePlusRbias()
+
+sns.set_theme(style="whitegrid", context="notebook")
+plt.rcParams["figure.figsize"] = (12, 5)
+
+# Модифицируйте в соответствии со своей задачей
+TRACK = "team"  
+TRAIN_DAYS = 14
+MAX_TRAIN_ROWS = 1_500_000
+RIDGE_ALPHA = 4.0
+RANDOM_STATE = 42
+
+# Меняйте конфигурацию при необходимости
+TRACK_CONFIG = {
+    "solo": {
+        "train_path": "raw\\train_solo_track.parquet",
+        "test_path": "raw\\test_solo_track.parquet",
+        "target_col": "target_1h",
+        "forecast_points": 8,
+    },
+    "team": {
+        "train_path": "raw\\train_team_track.parquet",
+        "test_path": "raw\\test_team_track.parquet",
+        "target_col": "target_2h",
+        "forecast_points": 10,
+    },
+}
+
+CONFIG = TRACK_CONFIG[TRACK]
+TARGET_COL = CONFIG["target_col"]
+FORECAST_POINTS = CONFIG["forecast_points"]
+FUTURE_TARGET_COLS = [f"target_step_{step}" for step in range(1, FORECAST_POINTS + 1)]
+
+train_df = pd.read_parquet(CONFIG["train_path"])
+test_df = pd.read_parquet(CONFIG["test_path"])
+
+train_df["timestamp"] = pd.to_datetime(train_df["timestamp"])
+test_df["timestamp"] = pd.to_datetime(test_df["timestamp"])
+
+train_df = train_df.sort_values(["route_id", "timestamp"]).reset_index(drop=True)
+test_df = test_df.sort_values(["route_id", "timestamp"]).reset_index(drop=True)
 
 train_df = add_calendar_features(train_df)
 test_df = add_calendar_features(test_df)
@@ -124,7 +123,6 @@ for col in status_cols:
 for step in range(1, FORECAST_POINTS + 1):
     train_df[f"target_step_{step}"] = route_group[TARGET_COL].shift(-step)
 
-train_df[["route_id", "timestamp", TARGET_COL] + FUTURE_TARGET_COLS].head(10)
 supervised_df = train_df.dropna(subset=FUTURE_TARGET_COLS).copy()
 
 feature_cols = [col for col in train_df.columns if col not in {TARGET_COL, "timestamp", "id", *FUTURE_TARGET_COLS}]
@@ -228,7 +226,7 @@ forecast_df = forecast_df[["route_id", "timestamp", "forecast"]].sort_values(
 forecast_df = test_df.merge(forecast_df, 'outer')[["id", "forecast"]]
 forecast_df = forecast_df.rename(columns={"forecast": "y_pred"})
 
-submission_path =  f"submission_{TRACK}.csv"
+submission_path =  f"submissions/submission_{TRACK}.csv"
 joined_path =  f"test_with_forecast_{TRACK}.csv"
 
 forecast_df.to_csv(submission_path, index=False)
