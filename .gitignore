@@ -3,3 +3,9 @@
 .vscode
 *.csv
 baseline_template.ipynb
+.gocache/
+.gomodcache/
+.gotmp/
+.gotelemetry/
+artifacts/
+bin/
