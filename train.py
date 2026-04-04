@@ -208,7 +208,9 @@ feature_blocks = {
 }
 
 # Финальная модель для submission: используем самый полный блок D.
-feature_cols = feature_blocks["+status_history"]
+# feature_cols = feature_blocks["+status_history"]
+# Для совместимости с ML-сервисом используем только базовые признаки
+feature_cols = ["route_id"] + calendar_cols
 
 train_model_df = supervised_df[feature_cols + ["timestamp"] + FUTURE_TARGET_COLS].copy()
 train_model_df = train_model_df.rename(columns={"timestamp": "source_timestamp"})
@@ -258,7 +260,7 @@ y_valid = valid_df[FUTURE_TARGET_COLS].copy()
 
 X_test = test_model_df[feature_cols].copy()
 
-categorical_features = ["route_id", "office_from_id"]
+categorical_features = ["route_id"]
 
 # LGBM ожидает категориальные признаки как str/category.
 X_fit_lgbm = X_fit.copy()
