@@ -152,6 +152,25 @@ func (c *Client) OpenLogsStream(ctx context.Context, limit int) (*http.Response,
 	return response, nil
 }
 
+func (c *Client) LoadPointsFromDataset(ctx context.Context, inputPath string) ([]domain.ForecastPoint, error) {
+	requestBody := map[string]string{
+		"input_path": inputPath,
+	}
+
+	var response struct {
+		Points []domain.ForecastPoint `json:"points"`
+	}
+
+	c.logInfo("dataset_points request input_path=%s", inputPath)
+	if err := c.postJSON(ctx, "/dataset/points", requestBody, &response); err != nil {
+		c.logError("dataset_points request failed: %v", err)
+		return nil, err
+	}
+
+	c.logInfo("dataset_points response input_path=%s points=%d", inputPath, len(response.Points))
+	return response.Points, nil
+}
+
 func (c *Client) logInfo(format string, args ...any) {
 	if c.logger != nil {
 		c.logger.Info("ml-client", format, args...)

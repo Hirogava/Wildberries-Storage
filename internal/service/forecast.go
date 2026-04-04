@@ -62,11 +62,11 @@ func (s *ForecastService) Predict(ctx context.Context, req domain.ForecastReques
 func validatePoints(points []domain.ForecastPoint) error {
 	seen := make(map[int64]struct{}, len(points))
 	for _, point := range points {
-		if point.ID <= 0 {
-			return fmt.Errorf("point id must be positive")
+		if point.ID < 0 {
+			return fmt.Errorf("point id must be non-negative")
 		}
-		if point.RouteID <= 0 {
-			return fmt.Errorf("route_id must be positive for point %d", point.ID)
+		if point.RouteID < 0 {
+			return fmt.Errorf("route_id must be non-negative for point %d", point.ID)
 		}
 		if point.Timestamp.IsZero() {
 			return fmt.Errorf("timestamp is required for point %d", point.ID)

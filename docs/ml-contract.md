@@ -1,14 +1,18 @@
-# HTTP-контракт с внешним ML-сервисом
+# HTTP-контракт внешнего ML-сервиса
 
-Этот репозиторий не реализует AI-часть. Команда ML должна поднять отдельный сервис, совместимый с контрактом ниже.
+Go API ожидает внешний ML-сервис, совместимый с контрактом ниже.
 
 ## `GET /healthz`
 
-Ответ `200 OK`, если сервис готов принимать запросы.
+Проверка состояния ML-сервиса.
 
 ## `GET /logs`
 
-Необязательный endpoint для локального стенда и UI-диагностики. Возвращает последние логи ML-сервиса.
+JSON-снимок последних логов ML-сервиса для UI и диагностики.
+
+## `GET /stream/logs`
+
+SSE-поток логов ML-сервиса.
 
 ## `POST /predict`
 
@@ -38,11 +42,37 @@
       "y_pred": 19.4
     }
   ],
-  "model": "ridge_v1"
+  "model": "lgbm_v1"
 }
 ```
 
-`route_id` и `timestamp` намеренно не возвращаются: Go backend восстанавливает этот контекст из исходного `points` по `id`, когда передаёт результат в `/decision`.
+`route_id` и `timestamp` не обязаны возвращаться: Go backend умеет восстановить этот контекст по исходным `points`.
+
+## `POST /dataset/points`
+
+Используется для batch-сценария и преобразует конкурсный файл в нормализованный список `points`.
+
+### Request
+
+```json
+{
+  "input_path": "test_team_track.parquet"
+}
+```
+
+### Response
+
+```json
+{
+  "points": [
+    {
+      "id": 4900,
+      "route_id": 12345,
+      "timestamp": "2026-03-30T12:30:00Z"
+    }
+  ]
+}
+```
 
 ## `POST /model/select`
 
@@ -51,7 +81,7 @@
 ```json
 {
   "request_id": "req-2026-03-30-0002",
-  "candidates": ["ridge_v1", "lgbm_v2"],
+  "candidates": ["ridge_v1", "lgbm_v1", "lgbm_v2"],
   "objective": "wape_plus_rbias",
   "context": {
     "dataset": "team_track_validation"
@@ -64,15 +94,11 @@
 ```json
 {
   "request_id": "req-2026-03-30-0002",
-  "selected_model": "lgbm_v2",
+  "selected_model": "lgbm_v1",
   "ranking": [
     {
-      "model": "lgbm_v2",
+      "model": "lgbm_v1",
       "score": 0.1842
-    },
-    {
-      "model": "ridge_v1",
-      "score": 0.1911
     }
   ]
 }

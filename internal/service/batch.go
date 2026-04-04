@@ -4,23 +4,37 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"wildberries-storage/internal/domain"
 	"wildberries-storage/internal/storage"
 )
 
+const batchPredictChunkSize = 1000
+
+type DatasetPointsLoader interface {
+	LoadPointsFromDataset(ctx context.Context, inputPath string) ([]domain.ForecastPoint, error)
+}
+
 type BatchService struct {
 	forecast      *ForecastService
 	fileStore     *storage.FileStore
 	submissionDir string
+	datasetLoader DatasetPointsLoader
 }
 
-func NewBatchService(forecast *ForecastService, fileStore *storage.FileStore, submissionDir string) *BatchService {
+func NewBatchService(
+	forecast *ForecastService,
+	fileStore *storage.FileStore,
+	submissionDir string,
+	datasetLoader DatasetPointsLoader,
+) *BatchService {
 	return &BatchService{
 		forecast:      forecast,
 		fileStore:     fileStore,
 		submissionDir: submissionDir,
+		datasetLoader: datasetLoader,
 	}
 }
 
@@ -35,15 +49,17 @@ func (s *BatchService) Run(ctx context.Context, req domain.BatchRequest) (domain
 
 		loaded, err := s.fileStore.LoadPoints(req.InputPath)
 		if err != nil {
-			return domain.BatchResponse{}, err
+			if strings.EqualFold(filepath.Ext(req.InputPath), ".parquet") && s.datasetLoader != nil {
+				loaded, err = s.datasetLoader.LoadPointsFromDataset(ctx, req.InputPath)
+			}
+			if err != nil {
+				return domain.BatchResponse{}, err
+			}
 		}
 		points = loaded
 	}
 
-	response, err := s.forecast.Predict(ctx, domain.ForecastRequest{
-		RequestID: req.RequestID,
-		Points:    points,
-	})
+	response, err := s.predictInChunks(ctx, req.RequestID, points)
 	if err != nil {
 		return domain.BatchResponse{}, err
 	}
@@ -69,4 +85,37 @@ func (s *BatchService) Run(ctx context.Context, req domain.BatchRequest) (domain
 	}
 
 	return batchResponse, nil
+}
+
+func (s *BatchService) predictInChunks(ctx context.Context, requestID string, points []domain.ForecastPoint) (domain.ForecastResponse, error) {
+	if len(points) <= batchPredictChunkSize {
+		return s.forecast.Predict(ctx, domain.ForecastRequest{
+			RequestID: requestID,
+			Points:    points,
+		})
+	}
+
+	predictions := make([]domain.Prediction, 0, len(points))
+	for start := 0; start < len(points); start += batchPredictChunkSize {
+		end := start + batchPredictChunkSize
+		if end > len(points) {
+			end = len(points)
+		}
+
+		chunkRequestID := fmt.Sprintf("%s-chunk-%d", requestID, start/batchPredictChunkSize+1)
+		chunkResponse, err := s.forecast.Predict(ctx, domain.ForecastRequest{
+			RequestID: chunkRequestID,
+			Points:    points[start:end],
+		})
+		if err != nil {
+			return domain.ForecastResponse{}, err
+		}
+
+		predictions = append(predictions, chunkResponse.Predictions...)
+	}
+
+	return domain.ForecastResponse{
+		RequestID:   requestID,
+		Predictions: predictions,
+	}, nil
 }

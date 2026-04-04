@@ -52,7 +52,7 @@ func (f fakeHealth) Logs(_ context.Context, _ int) ([]observability.Entry, error
 func TestPredictHandler(t *testing.T) {
 	forecastService := service.NewForecastService(fakePredictor{}, 0, 4)
 	decisionService := service.NewDecisionService(forecastService, 0.1, 20, 50)
-	batchService := service.NewBatchService(forecastService, storage.NewFileStore(t.TempDir()), t.TempDir())
+	batchService := service.NewBatchService(forecastService, storage.NewFileStore(t.TempDir()), t.TempDir(), nil)
 	metricsService := service.NewMetricsService(storage.NewFileStore(t.TempDir()))
 	modelSelectService := service.NewModelSelectService(fakeSelector{})
 

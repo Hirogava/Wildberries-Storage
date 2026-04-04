@@ -3,79 +3,213 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Wildberries Storage Control Panel</title>
+    <title>Wildberries Storage Orchestrator</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <div class="ambient ambient--one"></div>
+    <div class="ambient ambient--two"></div>
+
     <div class="page-shell">
       <header class="hero">
-        <div class="hero__badge">Wildberries Storage MVP</div>
-        <h1>Панель проверки бэкенда</h1>
-        <p>
-          Здесь можно руками проверить прогноз, решение по вызову транспорта,
-          batch-генерацию, метрики и выбор модели.
-        </p>
-        <div class="hero__actions">
-          <button class="ghost-button" data-action="fill-all">Заполнить примеры</button>
-          <button class="ghost-button" data-action="health">Проверить health</button>
+        <div class="hero__copy">
+          <div class="hero__eyebrow">Wildberries Team Track 2026</div>
+          <h1>Автоматический вызов транспорта на основе прогноза отгрузок</h1>
+          <p>
+            Демонстрационный контур объединяет прогноз, decision engine, batch-генерацию
+            submission и контроль метрик в едином интерфейсе для защиты решения.
+          </p>
+
+          <div class="hero__actions">
+            <button class="ghost-button" data-action="fill-all">Обновить сценарии</button>
+            <button class="ghost-button" data-action="health">Проверить контур</button>
+            <button class="primary-button" data-action="demo">Запустить demo chain</button>
+          </div>
+        </div>
+
+        <div class="hero__stats">
+          <div class="stat-card">
+            <span class="stat-card__label">Горизонт решения</span>
+            <strong>2 часа</strong>
+            <small>операционный прогноз на вызов транспорта по маршрутам</small>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card__label">Частота пересчёта</span>
+            <strong>30 минут</strong>
+            <small>шаг обновления временных точек</small>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card__label">Целевая метрика</span>
+            <strong>WAPE + |Relative Bias|</strong>
+            <small>совпадает с формулой соревнования</small>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card__label">Текущий контур</span>
+            <strong id="topology-mode">Go API + Python ML</strong>
+            <small>оркестрация, inference, decision layer, batch и telemetry</small>
+          </div>
         </div>
       </header>
 
-      <main class="grid">
-        <section class="card">
-          <div class="card__title">/predict</div>
-          <p class="card__hint">Отправляет точки во внешний ML-сервис через Go API.</p>
-          <textarea id="predict-body"></textarea>
-          <button class="primary-button" data-endpoint="/predict" data-source="predict-body">Отправить</button>
+      <section class="status-strip">
+        <div class="status-chip" id="api-status">API: checking...</div>
+        <div class="status-chip" id="ml-status">ML: checking...</div>
+        <div class="status-chip status-chip--muted">Submission: CSV `id,y_pred`</div>
+        <div class="status-chip status-chip--muted">Auto sync: predict → decision, batch → metrics</div>
+      </section>
+
+      <section class="story-grid">
+        <article class="story-card story-card--wide">
+          <div class="story-card__header">
+            <span class="story-card__kicker">Product Flow</span>
+            <h2>От прогноза к операционному решению</h2>
+          </div>
+          <div class="flowline">
+            <div class="flow-step">
+              <span>01</span>
+              <strong>Predict</strong>
+              <p>ML-сервис оценивает ожидаемый объём отгрузки по маршрутам и временным точкам.</p>
+            </div>
+            <div class="flow-step">
+              <span>02</span>
+              <strong>Decision</strong>
+              <p>Decision layer пересчитывает прогноз в количество машин с учётом safety factor.</p>
+            </div>
+            <div class="flow-step">
+              <span>03</span>
+              <strong>Batch</strong>
+              <p>Поток offline-оценки формирует submission из конкурсного `test_team_track.parquet`.</p>
+            </div>
+            <div class="flow-step">
+              <span>04</span>
+              <strong>Metrics</strong>
+              <p>Контроль качества считает WAPE и Relative Bias на валидационном контуре.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="story-card">
+          <div class="story-card__header">
+            <span class="story-card__kicker">Decision Engine</span>
+            <h2>Формула расчёта машин</h2>
+          </div>
+          <pre class="formula-card">adjusted_load = y_pred * (1 + safety_factor)
+trucks_needed = ceil(adjusted_load / truck_capacity)</pre>
+        </article>
+      </section>
+
+      <main class="workspace">
+        <section class="control-board">
+          <div class="panel panel--dense">
+            <div class="panel__header">
+              <div>
+                <span class="panel__eyebrow">Scenario Inputs</span>
+                <h2>Контракты и рабочие payload'ы</h2>
+              </div>
+              <div class="panel__hint">Связка сценариев обновляется автоматически после успешных вызовов</div>
+            </div>
+
+            <div class="endpoint-grid">
+              <section class="endpoint-card">
+                <div class="endpoint-card__head">
+                  <h3>/predict</h3>
+                  <span>forecast inference</span>
+                </div>
+                <textarea id="predict-body"></textarea>
+                <button class="primary-button" data-endpoint="/predict" data-source="predict-body">Отправить</button>
+              </section>
+
+              <section class="endpoint-card">
+                <div class="endpoint-card__head">
+                  <h3>/decision</h3>
+                  <span>dispatch calculation</span>
+                </div>
+                <textarea id="decision-body"></textarea>
+                <button class="primary-button" data-endpoint="/decision" data-source="decision-body">Отправить</button>
+              </section>
+
+              <section class="endpoint-card">
+                <div class="endpoint-card__head">
+                  <h3>/batch</h3>
+                  <span>submission generator</span>
+                </div>
+                <textarea id="batch-body"></textarea>
+                <button class="primary-button" data-endpoint="/batch" data-source="batch-body">Отправить</button>
+              </section>
+
+              <section class="endpoint-card">
+                <div class="endpoint-card__head">
+                  <h3>/metrics</h3>
+                  <span>offline evaluation</span>
+                </div>
+                <textarea id="metrics-body"></textarea>
+                <button class="primary-button" data-endpoint="/metrics" data-source="metrics-body">Отправить</button>
+              </section>
+
+              <section class="endpoint-card">
+                <div class="endpoint-card__head">
+                  <h3>/model/select</h3>
+                  <span>model governance</span>
+                </div>
+                <textarea id="model-body"></textarea>
+                <button class="primary-button" data-endpoint="/model/select" data-source="model-body">Отправить</button>
+              </section>
+            </div>
+          </div>
         </section>
 
-        <section class="card">
-          <div class="card__title">/decision</div>
-          <p class="card__hint">Принимает либо точки, либо `predictions` из `/predict` плюс исходные `points`.</p>
-          <textarea id="decision-body"></textarea>
-          <button class="primary-button" data-endpoint="/decision" data-source="decision-body">Отправить</button>
-        </section>
+        <aside class="insight-board">
+          <section class="panel">
+            <div class="panel__header">
+              <div>
+                <span class="panel__eyebrow">Service Response</span>
+                <h2>Результат вызова</h2>
+              </div>
+              <div class="response-meta" id="response-meta">ready</div>
+            </div>
+            <pre id="response-output" class="response-output">Ожидание запроса...</pre>
+          </section>
 
-        <section class="card">
-          <div class="card__title">/batch</div>
-          <p class="card__hint">Генерирует `submission.csv` и может вернуть прогнозы в ответе.</p>
-          <textarea id="batch-body"></textarea>
-          <button class="primary-button" data-endpoint="/batch" data-source="batch-body">Отправить</button>
-        </section>
-
-        <section class="card">
-          <div class="card__title">/metrics</div>
-          <p class="card__hint">Считает `WAPE + |Relative Bias|` прямо из JSON-наблюдений.</p>
-          <textarea id="metrics-body"></textarea>
-          <button class="primary-button" data-endpoint="/metrics" data-source="metrics-body">Отправить</button>
-        </section>
-
-        <section class="card">
-          <div class="card__title">/model/select</div>
-          <p class="card__hint">Проксирует выбор модели в ML-сервис.</p>
-          <textarea id="model-body"></textarea>
-          <button class="primary-button" data-endpoint="/model/select" data-source="model-body">Отправить</button>
-        </section>
-
-        <section class="card card--output">
-          <div class="card__title">Ответ</div>
-          <pre id="response-output">Нажмите "Заполнить примеры", затем выберите интересующий endpoint.</pre>
-        </section>
-
-        <section class="card card--logs">
-          <div class="card__title">Логи Go API</div>
-          <p class="card__hint">Живой поток логов основного backend-сервиса.</p>
-          <pre id="go-logs-output">Ожидание логов Go...</pre>
-        </section>
-
-        <section class="card card--logs">
-          <div class="card__title">Логи Python ML Stub</div>
-          <p class="card__hint">Живой поток логов Python-сервиса, который получает запросы от Go.</p>
-          <pre id="ml-logs-output">Ожидание логов Python...</pre>
-        </section>
+          <section class="panel">
+            <div class="panel__header">
+              <div>
+                <span class="panel__eyebrow">Competition Readiness</span>
+                <h2>Ключевые акценты защиты</h2>
+              </div>
+            </div>
+            <ul class="checklist">
+              <li>Онлайн-контур: прогноз → решение → вызов транспорта</li>
+              <li>Offline-контур: parquet → submission.csv → лидерборд</li>
+              <li>Сервисная метрика и продуктовая логика вынесены отдельно от ML-инференса</li>
+              <li>Go API и Python ML масштабируются независимо и связаны через HTTP-контракт</li>
+            </ul>
+          </section>
+        </aside>
       </main>
+
+      <section class="telemetry">
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <span class="panel__eyebrow">Live Telemetry</span>
+              <h2>Go API</h2>
+            </div>
+          </div>
+          <pre id="go-logs-output" class="log-output">Подключение к потоку логов Go...</pre>
+        </section>
+
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <span class="panel__eyebrow">Live Telemetry</span>
+              <h2>Python ML Service</h2>
+            </div>
+          </div>
+          <pre id="ml-logs-output" class="log-output">Подключение к потоку логов Python...</pre>
+        </section>
+      </section>
     </div>
 
     <script src="/app.js"></script>
   </body>
-  </html>
+</html>

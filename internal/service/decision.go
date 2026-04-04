@@ -133,8 +133,8 @@ func enrichDecisionPredictions(predictions []domain.DecisionPrediction, points [
 	normalized := make([]domain.DecisionPrediction, 0, len(predictions))
 
 	for _, prediction := range predictions {
-		if prediction.ID <= 0 {
-			return nil, fmt.Errorf("prediction id must be positive")
+		if prediction.ID < 0 {
+			return nil, fmt.Errorf("prediction id must be non-negative")
 		}
 		if prediction.YPred < 0 {
 			prediction.YPred = 0
@@ -157,8 +157,8 @@ func enrichDecisionPredictions(predictions []domain.DecisionPrediction, points [
 			}
 		}
 
-		if prediction.RouteID <= 0 {
-			return nil, fmt.Errorf("route_id must be positive for prediction %d", prediction.ID)
+		if prediction.RouteID < 0 {
+			return nil, fmt.Errorf("route_id must be non-negative for prediction %d", prediction.ID)
 		}
 		if prediction.Timestamp.IsZero() {
 			return nil, fmt.Errorf("timestamp is required for prediction %d", prediction.ID)

@@ -29,7 +29,7 @@ func NewServer(cfg config.Config) (*http.Server, error) {
 		cfg.DefaultTruckCapacity,
 		cfg.MaxTrucksPerRoute,
 	)
-	batchService := service.NewBatchService(forecastService, fileStore, cfg.SubmissionDir)
+	batchService := service.NewBatchService(forecastService, fileStore, cfg.SubmissionDir, mlClient)
 	metricsService := service.NewMetricsService(fileStore)
 	modelSelectService := service.NewModelSelectService(mlClient)
 
