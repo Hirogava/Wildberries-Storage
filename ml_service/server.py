@@ -8,10 +8,37 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import joblib
+import numpy as np
+import pandas as pd
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(script_dir, '..', 'baseline_lgbm')
+models = joblib.load(model_path)
+
+def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+
+    df["hour"] = df["timestamp"].dt.hour
+    df["minute"] = df["timestamp"].dt.minute
+    df["dayofweek"] = df["timestamp"].dt.dayofweek
+    df["is_weekend"] = (df["dayofweek"] >= 5).astype(int)
+
+    # Циклическое кодирование времени суток
+    minutes_of_day = df["hour"] * 60 + df["minute"]
+    df["tod_sin"] = np.sin(2 * np.pi * minutes_of_day / 1440)
+    df["tod_cos"] = np.cos(2 * np.pi * minutes_of_day / 1440)
+
+    # Циклическое кодирование дня недели
+    df["dow_sin"] = np.sin(2 * np.pi * df["dayofweek"] / 7)
+    df["dow_cos"] = np.cos(2 * np.pi * df["dayofweek"] / 7)
+
+    return df
+
 
 HOST = os.getenv("ML_SERVICE_HOST", "0.0.0.0")
 PORT = int(os.getenv("ML_SERVICE_PORT", "8090"))
-DEFAULT_MODEL = os.getenv("ML_DEFAULT_MODEL", "stub_v1")
+DEFAULT_MODEL = os.getenv("ML_DEFAULT_MODEL", "lgbm_v1")
 LOG_BUFFER_SIZE = int(os.getenv("ML_LOG_BUFFER_SIZE", "300"))
 LOGS = deque(maxlen=LOG_BUFFER_SIZE)
 LOGS_CONDITION = threading.Condition()
@@ -40,19 +67,25 @@ def log_event(level: str, component: str, message: str):
 
 def build_prediction(point: dict) -> float:
     """
-    Stub scoring function.
-    ML team can replace only this function with real feature loading,
-    model inference and post-processing while keeping the HTTP contract stable.
+    ML prediction using loaded LGBM model.
     """
-    route_id = int(point["route_id"])
-    timestamp = point["timestamp"]
-    dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    df = pd.DataFrame([point])
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df = add_calendar_features(df)
 
-    hour_factor = (dt.hour + dt.minute / 60.0) * 0.55
-    route_factor = (route_id % 17) * 1.15
-    base = 8.0 + hour_factor + route_factor
+    feature_cols = ["route_id"] + [
+        "hour", "minute", "dayofweek", "is_weekend", "tod_sin", "tod_cos", "dow_sin", "dow_cos"
+    ]
+    feature_cols = [c for c in feature_cols if c in df.columns]
 
-    return round(max(0.0, base), 4)
+    X = df[feature_cols].copy()
+    categorical_features = ["route_id"]
+    for c in categorical_features:
+        if c in X.columns:
+            X[c] = X[c].astype("category")
+
+    pred = models["target_step_1"].predict(X)[0]
+    return round(max(0.0, pred), 4)
 
 
 def select_model(candidates: list[str]) -> dict:
