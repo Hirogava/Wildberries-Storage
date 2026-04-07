@@ -10,6 +10,7 @@ func NewRouter(handlers *Handlers, uiHandler http.Handler) http.Handler {
 	mux.HandleFunc("/batch", handlers.Batch)
 	mux.HandleFunc("/metrics", handlers.Metrics)
 	mux.HandleFunc("/model/select", handlers.ModelSelect)
+	mux.HandleFunc("/files/upload", handlers.UploadFile)
 	mux.HandleFunc("/logs/go", handlers.GoLogs)
 	mux.HandleFunc("/logs/ml", handlers.MLLogs)
 	mux.HandleFunc("/stream/logs/go", handlers.GoLogsStream)

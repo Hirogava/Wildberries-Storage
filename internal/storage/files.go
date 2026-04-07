@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -103,6 +104,46 @@ func (s *FileStore) WriteSubmission(path string, predictions []domain.Prediction
 	}
 
 	return resolvedPath, nil
+}
+
+func (s *FileStore) SaveUploadedFile(uploadDir, originalName string, source io.Reader) (domain.FileUploadResponse, error) {
+	if originalName == "" {
+		return domain.FileUploadResponse{}, fmt.Errorf("uploaded file must have a name")
+	}
+
+	resolvedDir, err := s.resolvePath(uploadDir)
+	if err != nil {
+		return domain.FileUploadResponse{}, err
+	}
+	if err := os.MkdirAll(resolvedDir, 0o755); err != nil {
+		return domain.FileUploadResponse{}, fmt.Errorf("create upload directory: %w", err)
+	}
+
+	filename := fmt.Sprintf("%s_%s", time.Now().UTC().Format("20060102_150405"), sanitizeFilename(originalName))
+	resolvedPath := filepath.Join(resolvedDir, filename)
+
+	file, err := os.Create(resolvedPath)
+	if err != nil {
+		return domain.FileUploadResponse{}, fmt.Errorf("create uploaded file: %w", err)
+	}
+	defer file.Close()
+
+	size, err := io.Copy(file, source)
+	if err != nil {
+		return domain.FileUploadResponse{}, fmt.Errorf("save uploaded file: %w", err)
+	}
+
+	relativePath, err := filepath.Rel(s.workspaceDir, resolvedPath)
+	if err != nil {
+		return domain.FileUploadResponse{}, fmt.Errorf("resolve uploaded file path: %w", err)
+	}
+
+	return domain.FileUploadResponse{
+		Filename:     filename,
+		Path:         resolvedPath,
+		RelativePath: relativePath,
+		Size:         size,
+	}, nil
 }
 
 func (s *FileStore) loadPointsFromJSON(path string) ([]domain.ForecastPoint, error) {
@@ -222,6 +263,9 @@ func (s *FileStore) resolvePath(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("path must not be empty")
 	}
+	if isWindowsHostPath(path) {
+		return "", fmt.Errorf("windows host path %s is not accessible from container; upload the file via /files/upload or use a workspace-relative path", path)
+	}
 
 	var resolved string
 	if filepath.IsAbs(path) {
@@ -252,6 +296,33 @@ func indexHeader(columns []string) map[string]int {
 func defaultString(value, fallback string) string {
 	if value == "" {
 		return fallback
+	}
+	return value
+}
+
+func isWindowsHostPath(path string) bool {
+	return len(path) >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/')
+}
+
+func sanitizeFilename(value string) string {
+	value = strings.ReplaceAll(value, "\\", "/")
+	value = filepath.Base(value)
+	value = strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == '.', r == '-', r == '_':
+			return r
+		default:
+			return '_'
+		}
+	}, value)
+	if value == "" {
+		return "upload.bin"
 	}
 	return value
 }

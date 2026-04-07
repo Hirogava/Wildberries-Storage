@@ -14,6 +14,8 @@ services:
       ML_MODEL_PATH: /app/baseline_lgbm
     ports:
       - "8090:8090"
+    volumes:
+      - ./artifacts:/app/artifacts
 
   api:
     build:

@@ -185,7 +185,7 @@ def load_points_from_dataset(input_path: str) -> list[dict]:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "WBMLStub/0.2"
+    server_version = "WBPythonMLService/0.2"
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -196,7 +196,7 @@ class Handler(BaseHTTPRequestHandler):
                 200,
                 {
                     "status": "ok",
-                    "service": "ml-stub",
+                    "service": "python-ml-service",
                     "model": DEFAULT_MODEL,
                     "mode": "model" if MODELS is not None else "fallback",
                     "timestamp": utc_now_iso(),
@@ -209,7 +209,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(
                 200,
                 {
-                    "service": "ml-stub",
+                    "service": "python-ml-service",
                     "entries": list(LOGS)[-limit:],
                 },
             )
@@ -389,12 +389,12 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     mode = "model" if MODELS is not None else "fallback"
     if MODELS is not None:
-        log_event("INFO", "bootstrap", f"starting ml stub host={HOST} port={PORT} model={DEFAULT_MODEL} mode={mode}")
+        log_event("INFO", "bootstrap", f"starting python ml service host={HOST} port={PORT} model={DEFAULT_MODEL} mode={mode}")
     else:
-        log_event("WARN", "bootstrap", f"starting ml stub host={HOST} port={PORT} model={DEFAULT_MODEL} mode={mode} error={MODEL_LOAD_ERROR}")
+        log_event("WARN", "bootstrap", f"starting python ml service host={HOST} port={PORT} model={DEFAULT_MODEL} mode={mode} error={MODEL_LOAD_ERROR}")
 
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"ml-stub listening on http://{HOST}:{PORT}")
+    print(f"python-ml-service listening on http://{HOST}:{PORT}")
     server.serve_forever()
 
 
