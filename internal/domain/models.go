@@ -119,3 +119,10 @@ type HealthResponse struct {
 	Services  map[string]string `json:"services"`
 	Timestamp time.Time         `json:"timestamp"`
 }
+
+type FileUploadResponse struct {
+	Filename     string `json:"filename"`
+	Path         string `json:"path"`
+	RelativePath string `json:"relative_path"`
+	Size         int64  `json:"size"`
+}

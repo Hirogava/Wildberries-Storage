@@ -15,6 +15,7 @@ import (
 	"wildberries-storage/internal/domain"
 	"wildberries-storage/internal/observability"
 	"wildberries-storage/internal/service"
+	"wildberries-storage/internal/storage"
 )
 
 type MLHealthChecker interface {
@@ -38,6 +39,8 @@ type Handlers struct {
 	mlHealth    MLHealthChecker
 	mlLogs      MLLogsReader
 	mlStream    MLLogsStreamer
+	fileStore   *storage.FileStore
+	uploadDir   string
 	logger      *observability.Logger
 }
 
@@ -48,6 +51,8 @@ func NewHandlers(
 	metrics *service.MetricsService,
 	modelSelect *service.ModelSelectService,
 	mlHealth MLHealthChecker,
+	fileStore *storage.FileStore,
+	uploadDir string,
 	logger *observability.Logger,
 ) *Handlers {
 	var mlLogs MLLogsReader
@@ -68,6 +73,8 @@ func NewHandlers(
 		mlHealth:    mlHealth,
 		mlLogs:      mlLogs,
 		mlStream:    mlStream,
+		fileStore:   fileStore,
+		uploadDir:   uploadDir,
 		logger:      logger,
 	}
 }
@@ -252,6 +259,38 @@ func (h *Handlers) ModelSelect(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+func (h *Handlers) UploadFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.fileStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "file storage is not configured")
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "file field is required")
+		return
+	}
+	defer file.Close()
+
+	response, err := h.fileStore.SaveUploadedFile(h.uploadDir, header.Filename, file)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Error("http", "POST /files/upload failed: %v", err)
+		}
+		writeServiceError(w, err)
+		return
+	}
+	if h.logger != nil {
+		h.logger.Info("http", "POST /files/upload completed filename=%s relative_path=%s size=%d", response.Filename, response.RelativePath, response.Size)
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
 func (h *Handlers) GoLogs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -292,7 +331,7 @@ func (h *Handlers) MLLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"service": "ml-stub",
+		"service": "python-ml-service",
 		"entries": entries,
 	})
 }

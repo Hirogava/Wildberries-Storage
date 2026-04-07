@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Wildberries Storage Orchestrator</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/styles.css?v=20260407-3" />
   </head>
   <body>
     <div class="ambient ambient--one"></div>
@@ -55,7 +55,7 @@
         <div class="status-chip" id="api-status">API: checking...</div>
         <div class="status-chip" id="ml-status">ML: checking...</div>
         <div class="status-chip status-chip--muted">Submission: CSV `id,y_pred`</div>
-        <div class="status-chip status-chip--muted">Auto sync: predict → decision, batch → metrics</div>
+        <div class="status-chip status-chip--muted">Auto sync: predict → decision, batch → prediction path</div>
       </section>
 
       <section class="story-grid">
@@ -107,6 +107,40 @@ trucks_needed = ceil(adjusted_load / truck_capacity)</pre>
                 <h2>Контракты и рабочие payload'ы</h2>
               </div>
               <div class="panel__hint">Связка сценариев обновляется автоматически после успешных вызовов</div>
+            </div>
+
+            <div class="upload-callout">
+              <strong>Как пользоваться загрузкой</strong>
+              <p>Обычный сценарий такой: сначала загрузить dataset для `/batch`, затем запустить `/batch`, после этого загрузить `actual.csv` и только потом запускать `/metrics` для честной проверки качества.</p>
+            </div>
+
+            <div class="upload-grid">
+              <section class="upload-card">
+                <span class="upload-card__badge">1. Для /batch</span>
+                <strong>Batch dataset</strong>
+                <small>Сюда загружается конкурсный `test_team_track.parquet` или свой `.csv/.json` с колонками `id, route_id, timestamp`.</small>
+                <input id="upload-batch-input" type="file" accept=".parquet,.csv,.json,application/json,text/csv" />
+                <button class="ghost-button" data-upload-target="batch-input">Upload dataset</button>
+                <div class="upload-status" id="upload-status-batch-input">Файл не выбран</div>
+              </section>
+
+              <section class="upload-card">
+                <span class="upload-card__badge">2. Для /metrics</span>
+                <strong>Metrics actual.csv</strong>
+                <small>Сюда загружается файл `id,y_true` с истинными значениями. Обычно он готовится из вашего validation/holdout на основе `train_team_track.parquet`.</small>
+                <input id="upload-metrics-actual" type="file" accept=".csv,text/csv" />
+                <button class="ghost-button" data-upload-target="metrics-actual">Upload actual</button>
+                <div class="upload-status" id="upload-status-metrics-actual">Файл не выбран</div>
+              </section>
+
+              <section class="upload-card">
+                <span class="upload-card__badge">3. Опционально</span>
+                <strong>Metrics prediction.csv</strong>
+                <small>Это файл `id,y_pred`. Обычно вручную не нужен: после `/batch` путь подставится сам. Загружайте только если у вас уже есть готовый CSV с предсказаниями.</small>
+                <input id="upload-metrics-prediction" type="file" accept=".csv,text/csv" />
+                <button class="ghost-button" data-upload-target="metrics-prediction">Upload prediction</button>
+                <div class="upload-status" id="upload-status-metrics-prediction">Файл не выбран</div>
+              </section>
             </div>
 
             <div class="endpoint-grid">
@@ -210,6 +244,6 @@ trucks_needed = ceil(adjusted_load / truck_capacity)</pre>
       </section>
     </div>
 
-    <script src="/app.js"></script>
+    <script src="/app.js?v=20260407-3"></script>
   </body>
 </html>

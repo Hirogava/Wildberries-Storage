@@ -40,6 +40,8 @@ func NewServer(cfg config.Config) (*http.Server, error) {
 		metricsService,
 		modelSelectService,
 		mlClient,
+		fileStore,
+		cfg.UploadDir,
 		logger,
 	)
 

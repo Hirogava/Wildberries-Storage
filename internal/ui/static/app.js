@@ -84,6 +84,22 @@ function writeEditor(id, payload) {
   byId(id).value = pretty(payload);
 }
 
+function setUploadStatus(target, text, kind = "idle") {
+  const node = byId(`upload-status-${target}`);
+  if (!node) {
+    return;
+  }
+
+  node.className = "upload-status";
+  if (kind === "ready") {
+    node.classList.add("upload-status--ready");
+  } else if (kind === "error") {
+    node.classList.add("upload-status--error");
+  }
+
+  node.textContent = text;
+}
+
 function renderLogs(targetId, payload) {
   const entries = Array.isArray(payload?.entries) ? payload.entries : [];
   const target = byId(targetId);
@@ -93,7 +109,7 @@ function renderLogs(targetId, payload) {
     ? entries
         .map((entry) => `[${entry.timestamp}] [${entry.level}] [${entry.component}] ${entry.message}`)
         .join("\n")
-    : "Логи пока пусты.";
+    : "No logs yet.";
 
   if (shouldStickToBottom) {
     target.scrollTop = target.scrollHeight;
@@ -106,7 +122,10 @@ function fillAll() {
   writeEditor("batch-body", samples.batch);
   writeEditor("metrics-body", samples.metrics);
   writeEditor("model-body", samples.model);
-  setResponseMeta("Сценарии загружены");
+  setUploadStatus("batch-input", "Файл не выбран");
+  setUploadStatus("metrics-actual", "Файл не выбран");
+  setUploadStatus("metrics-prediction", "Файл не выбран");
+  setResponseMeta("Scenarios loaded");
 }
 
 function setStatusChip(id, label, status) {
@@ -124,43 +143,45 @@ function setStatusChip(id, label, status) {
   node.textContent = label;
 }
 
-function round(value, digits = 4) {
-  const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
-}
-
 function syncDecisionFromPredict(request, response) {
   const current = parseEditorSafe("decision-body", {});
-  const payload = {
+  writeEditor("decision-body", {
     request_id: current.request_id || `${response.request_id || request.request_id || "req"}-decision`,
     points: Array.isArray(request.points) ? request.points : [],
     predictions: Array.isArray(response.predictions) ? response.predictions : [],
     safety_factor: current.safety_factor ?? 0.1,
     truck_capacity: current.truck_capacity ?? 20,
     max_trucks_per_route: current.max_trucks_per_route ?? 50
-  };
-  writeEditor("decision-body", payload);
+  });
 }
 
-function buildMetricsSmokePayload(predictions, requestId) {
-  const observations = predictions.slice(0, 25).map((prediction) => ({
-    id: prediction.id,
-    y_true: round(prediction.y_pred, 4),
-    y_pred: round(prediction.y_pred, 4)
-  }));
-
-  return {
-    request_id: `${requestId || "req"}-metrics-smoke`,
-    observations
-  };
+function normalizeWorkspacePath(path) {
+  if (typeof path !== "string") {
+    return path;
+  }
+  if (path.startsWith("/app/")) {
+    return path.slice(5);
+  }
+  return path;
 }
 
 function syncMetricsFromBatch(request, response) {
-  if (!Array.isArray(response.predictions) || response.predictions.length === 0) {
+  if (!response.output_path) {
     return;
   }
 
-  writeEditor("metrics-body", buildMetricsSmokePayload(response.predictions, response.request_id || request.request_id));
+  const current = parseEditorSafe("metrics-body", {});
+  if (!current.actual_path) {
+    return;
+  }
+
+  writeEditor("metrics-body", {
+    request_id: current.request_id || `${response.request_id || request.request_id || "req"}-metrics`,
+    actual_path: current.actual_path,
+    prediction_path: normalizeWorkspacePath(response.output_path),
+    actual_column: current.actual_column || "y_true",
+    prediction_column: current.prediction_column || "y_pred"
+  });
 }
 
 function syncDownstream(endpoint, request, response) {
@@ -179,7 +200,7 @@ async function sendRequest(endpoint, source) {
 
   try {
     const requestBody = parseEditor(source, {});
-    setResponseMeta(`Выполняется ${endpoint}...`);
+    setResponseMeta(`Running ${endpoint}...`);
     setOutput(`POST ${endpoint}`);
 
     const response = await fetch(endpoint, {
@@ -210,7 +231,88 @@ async function sendRequest(endpoint, source) {
     }
   } catch (error) {
     setOutput({ error: error.message });
-    setResponseMeta(`Ошибка • ${endpoint}`);
+    setResponseMeta(`Request failed • ${endpoint}`);
+  }
+}
+
+function buildMetricsPayloadForFileUpdate(current, updates = {}) {
+  return {
+    request_id: current.request_id || "req-2026-03-30-0005",
+    actual_path: updates.actual_path ?? current.actual_path ?? "",
+    prediction_path: updates.prediction_path ?? current.prediction_path ?? "",
+    actual_column: current.actual_column || "y_true",
+    prediction_column: current.prediction_column || "y_pred"
+  };
+}
+
+function updateEditorFromUpload(target, uploadResponse) {
+  const relativePath = uploadResponse?.relative_path || uploadResponse?.path || "";
+
+  if (target === "batch-input") {
+    const current = parseEditorSafe("batch-body", samples.batch);
+    writeEditor("batch-body", {
+      ...current,
+      points: [],
+      input_path: relativePath
+    });
+    setUploadStatus(target, `Загружено и подставлено в /batch: ${relativePath}`, "ready");
+    return;
+  }
+
+  if (target === "metrics-actual") {
+    const current = parseEditorSafe("metrics-body", samples.metrics);
+    writeEditor("metrics-body", buildMetricsPayloadForFileUpdate(current, { actual_path: relativePath }));
+    setUploadStatus(target, `Загружено и подставлено в actual_path: ${relativePath}`, "ready");
+    return;
+  }
+
+  if (target === "metrics-prediction") {
+    const current = parseEditorSafe("metrics-body", samples.metrics);
+    writeEditor("metrics-body", buildMetricsPayloadForFileUpdate(current, { prediction_path: relativePath }));
+    setUploadStatus(target, `Загружено и подставлено в prediction_path: ${relativePath}`, "ready");
+  }
+}
+
+async function uploadFile(target) {
+  const input = byId(`upload-${target}`);
+  const file = input?.files?.[0];
+  if (!file) {
+    setResponseMeta("Choose a file first");
+    setUploadStatus(target, "Сначала выберите файл через серую кнопку", "error");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    setResponseMeta(`Uploading ${file.name}...`);
+    setUploadStatus(target, `Загружаю ${file.name}...`);
+    const response = await fetch("/files/upload", {
+      method: "POST",
+      body: formData
+    });
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : {};
+
+    setOutput({
+      status: response.status,
+      body: payload
+    });
+
+    if (!response.ok) {
+      setResponseMeta(`Upload failed • ${response.status}`);
+      setUploadStatus(target, payload?.error || `Ошибка загрузки: ${response.status}`, "error");
+      return;
+    }
+
+    updateEditorFromUpload(target, payload);
+    setResponseMeta(`Uploaded ${payload.filename} • ${payload.relative_path}`);
+    input.value = "";
+  } catch (error) {
+    setOutput({ error: error.message });
+    setResponseMeta("Upload failed");
+    setUploadStatus(target, `Ошибка загрузки: ${error.message}`, "error");
   }
 }
 
@@ -239,9 +341,13 @@ async function healthCheckInternal(forceOutput) {
 
     if (forceOutput) {
       setOutput({ error: error.message });
-      setResponseMeta("Проверка health завершилась ошибкой");
+      setResponseMeta("Health check failed");
     }
   }
+}
+
+function canRunDemoMetrics(request) {
+  return Boolean(request?.actual_path && request?.prediction_path);
 }
 
 async function runDemoChain() {
@@ -281,25 +387,34 @@ async function runDemoChain() {
     const batchPayload = await batchResponse.json();
     syncMetricsFromBatch(batchRequest, batchPayload);
 
-    const metricsRequest = parseEditorSafe("metrics-body", {});
-    setResponseMeta("Demo chain • metrics");
-    const metricsResponse = await fetch("/metrics", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(metricsRequest)
-    });
-    const metricsPayload = await metricsResponse.json();
+    const metricsRequest = parseEditorSafe("metrics-body", samples.metrics);
+    let metricsStatus = null;
+    let metricsPayload = {
+      skipped: true,
+      reason: "Load actual.csv first to run an honest metrics check"
+    };
+
+    if (canRunDemoMetrics(metricsRequest)) {
+      setResponseMeta("Demo chain • metrics");
+      const metricsResponse = await fetch("/metrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(metricsRequest)
+      });
+      metricsStatus = metricsResponse.status;
+      metricsPayload = await metricsResponse.json();
+    }
 
     setOutput({
       predict: { status: predictResponse.status, body: predictPayload },
       decision: { status: decisionResponse.status, body: decisionPayload },
       batch: { status: batchResponse.status, body: batchPayload },
-      metrics: { status: metricsResponse.status, body: metricsPayload }
+      metrics: { status: metricsStatus, body: metricsPayload }
     });
-    setResponseMeta("Demo chain завершена");
+    setResponseMeta("Demo chain completed");
   } catch (error) {
     setOutput({ error: error.message });
-    setResponseMeta("Demo chain завершилась ошибкой");
+    setResponseMeta("Demo chain failed");
   }
 }
 
@@ -318,17 +433,27 @@ function connectLogStream(endpoint, targetId) {
       }
       renderLogs(targetId, { entries });
     } catch (error) {
-      target.textContent = `Ошибка декодирования потока: ${error.message}`;
+      target.textContent = `Stream decode error: ${error.message}`;
     }
   });
 
   source.onerror = () => {
-    target.textContent = "Поток телеметрии переподключается...";
+    target.textContent = "Telemetry stream is reconnecting...";
   };
 }
 
 document.querySelectorAll("[data-endpoint]").forEach((button) => {
   button.addEventListener("click", () => sendRequest(button.dataset.endpoint, button.dataset.source));
+});
+document.querySelectorAll("[data-upload-target]").forEach((button) => {
+  button.addEventListener("click", () => uploadFile(button.dataset.uploadTarget));
+});
+document.querySelectorAll('input[type="file"][id^="upload-"]').forEach((input) => {
+  input.addEventListener("change", () => {
+    const suffix = input.id.replace("upload-", "");
+    const file = input.files?.[0];
+    setUploadStatus(suffix, file ? `Выбран файл: ${file.name}` : "Файл не выбран");
+  });
 });
 
 document.querySelector('[data-action="fill-all"]').addEventListener("click", fillAll);

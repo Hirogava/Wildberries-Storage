@@ -21,6 +21,7 @@ type Config struct {
 	PredictionFloor      float64
 	PredictionPrecision  int
 	SubmissionDir        string
+	UploadDir            string
 	WorkspaceDir         string
 }
 
@@ -48,6 +49,8 @@ func Load() Config {
 
 	submissionDir := getString("SUBMISSION_DIR", filepath.Join("artifacts", "submissions"))
 	cfg.SubmissionDir = resolvePath(wd, submissionDir)
+	uploadDir := getString("UPLOAD_DIR", filepath.Join("artifacts", "uploads"))
+	cfg.UploadDir = resolvePath(wd, uploadDir)
 
 	return cfg
 }

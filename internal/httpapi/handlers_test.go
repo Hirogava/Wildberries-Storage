@@ -63,6 +63,8 @@ func TestPredictHandler(t *testing.T) {
 		metricsService,
 		modelSelectService,
 		fakeHealth{},
+		storage.NewFileStore(t.TempDir()),
+		t.TempDir(),
 		observability.NewLogger(50),
 	)
 

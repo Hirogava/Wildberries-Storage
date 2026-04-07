@@ -326,6 +326,92 @@ body {
   margin-top: 18px;
 }
 
+.upload-callout {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(115, 47, 240, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 239, 255, 0.88));
+}
+
+.upload-callout strong {
+  display: block;
+  font-size: 15px;
+}
+
+.upload-callout p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.upload-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+  align-items: stretch;
+}
+
+.upload-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(115, 47, 240, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 239, 255, 0.88));
+}
+
+.upload-card__badge {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(115, 47, 240, 0.1);
+  color: var(--primary-deep);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.upload-card strong,
+.upload-card small {
+  display: block;
+}
+
+.upload-card small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.upload-card input {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.upload-card .ghost-button {
+  width: 100%;
+  margin-top: auto;
+}
+
+.upload-status {
+  min-height: 36px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.upload-status--ready {
+  color: #0f766e;
+}
+
+.upload-status--error {
+  color: #b91c1c;
+}
+
 .endpoint-card {
   padding: 18px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 239, 255, 0.88));
@@ -447,7 +533,8 @@ button:hover {
   }
 
   .flowline,
-  .endpoint-grid {
+  .endpoint-grid,
+  .upload-grid {
     grid-template-columns: 1fr;
   }
 }
