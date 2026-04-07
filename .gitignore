@@ -1,5 +1,14 @@
 /venv
+.venv
 *.parquet
 .vscode
 *.csv
 baseline_template.ipynb
+.gocache/
+.gomodcache/
+.gotmp/
+.gotelemetry/
+artifacts/
+bin/
+__pycache__/
+.env

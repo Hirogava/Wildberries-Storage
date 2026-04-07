@@ -1,0 +1,42 @@
+services:
+  ml:
+    build:
+      context: .
+      dockerfile: ml_service/Dockerfile
+    container_name: wb-storage-ml
+    environment:
+      ML_SERVICE_HOST: 0.0.0.0
+      ML_SERVICE_PORT: 8090
+      ML_DEFAULT_MODEL: lgbm_v1
+      ML_USE_MODEL_PREDICTION: "true"
+      ML_FALLBACK_TO_RULES: "true"
+      WORKSPACE_DIR: /app
+      ML_MODEL_PATH: /app/baseline_lgbm
+    ports:
+      - "8090:8090"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wb-storage-api
+    depends_on:
+      - ml
+    environment:
+      APP_ADDR: :8080
+      APP_READ_TIMEOUT: 10s
+      APP_WRITE_TIMEOUT: 2m
+      APP_IDLE_TIMEOUT: 60s
+      LOG_BUFFER_SIZE: 300
+      ML_SERVICE_BASE_URL: http://ml:8090
+      ML_SERVICE_TIMEOUT: 2m
+      DEFAULT_TRUCK_CAPACITY: 20
+      DEFAULT_SAFETY_FACTOR: "0.10"
+      MAX_TRUCKS_PER_ROUTE: 50
+      PREDICTION_FLOOR: "0"
+      PREDICTION_PRECISION: 4
+      SUBMISSION_DIR: artifacts/submissions
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./artifacts:/app/artifacts

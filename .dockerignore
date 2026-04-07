@@ -1,0 +1,12 @@
+.git
+.gitignore
+.gocache
+.gomodcache
+.gotmp
+.gotelemetry
+.venv
+venv
+__pycache__
+*.pyc
+artifacts
+ml_service/__pycache__
